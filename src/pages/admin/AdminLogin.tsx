@@ -1,5 +1,5 @@
 // src/pages/admin/AdminLogin.tsx
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,9 @@ import { toast } from "sonner";
 import {
   SignedIn,
   SignedOut,
-  SignInButton,
-  UserButton,
+  UserButton,        // ← ADD THIS
+  useUser,
+  useAuth,
   useClerk,
 } from "@clerk/clerk-react";
 
@@ -18,8 +19,11 @@ const ADMIN_PASSCODE = "emperor2025"; // Change anytime!
 export default function AdminLogin() {
   const [passcode, setPasscode] = useState("");
   const [passcodeVerified, setPasscodeVerified] = useState(false);
+
   const navigate = useNavigate();
   const { openSignIn } = useClerk();
+  const { isSignedIn } = useAuth();           // ← proper way
+  const { isLoaded, user } = useUser();       // ← proper way
 
   const handlePasscode = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,19 +37,16 @@ export default function AdminLogin() {
     }
   };
 
-  // Auto-redirect when signed in after passcode
-  useEffect(() => {
-    if (passcodeVerified) {
-      const checkAuth = setInterval(() => {
-        if (document.querySelector("[data-clerk-signed-in]")) {
-          localStorage.setItem("admin-auth", "true");
-          navigate("/admin/dashboard", { replace: true });
-        }
-      }, 500);
+  // ──────────────────────────────────────────────────────────────
+  // AUTOMATIC REDIRECT when the user is signed in AND passcode is OK
+  // ──────────────────────────────────────────────────────────────
+  if (passcodeVerified && isLoaded && isSignedIn) {
+    // Mark as admin (you already check this in Dashboard)
+    localStorage.setItem("admin-auth", "true");
 
-      return () => clearInterval(checkAuth);
-    }
-  }, [passcodeVerified, navigate]);
+    // Use replace so the login page is removed from history
+    navigate("/admin/dashboard", { replace: true });
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -64,7 +65,7 @@ export default function AdminLogin() {
           {!passcodeVerified ? (
             <form onSubmit={handlePasscode} className="space-y-6">
               <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-8">
+ elér                <p className="text-sm text-muted-foreground mb-8">
                   Enter the secret admin passcode to continue
                 </p>
               </div>
@@ -84,18 +85,8 @@ export default function AdminLogin() {
             <>
               <div className="text-center py-8">
                 <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg
-                    className="w-12 h-12 text-green-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={3}
-                      d="M5 13l4 4L19 7"
-                    />
+                  <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
                 <h3 className="text-2xl font-bold text-foreground">Access Granted</h3>
@@ -104,9 +95,15 @@ export default function AdminLogin() {
                 </p>
               </div>
 
+              {/* Signed out → show Sign-in button */}
               <SignedOut>
                 <Button
-                  onClick={() => openSignIn({ afterSignInUrl: "/admin/dashboard" })}
+                  onClick={() =>
+                    openSignIn({
+                      // Clerk will redirect here automatically after sign-in
+                      afterSignInUrl: "/admin/dashboard",
+                    })
+                  }
                   size="lg"
                   className="w-full h-14 text-lg font-semibold bg-primary hover:bg-primary/90"
                 >
@@ -114,6 +111,7 @@ export default function AdminLogin() {
                 </Button>
               </SignedOut>
 
+              {/* Already signed in → show user button + redirect message */}
               <SignedIn>
                 <div className="text-center space-y-6">
                   <UserButton afterSignOutUrl="/" />
