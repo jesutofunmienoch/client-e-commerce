@@ -44,7 +44,7 @@ const App = () => (
               </Route>
 
               {/* SECRET ADMIN ACCESS — ONLY YOU KNOW THIS URL */}
-              <Route path="/emperor-access-2025" element={<AdminLogin />} />
+              <Route path="/a1b2c3d4e5f6g7h8i9j0-admin-emperor" element={<AdminLogin />} />
               <Route path="/admin/dashboard" element={<Dashboard />} />
             </Routes>
           </BrowserRouter>
