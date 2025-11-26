@@ -1,5 +1,6 @@
+// src/pages/ProductDetails.tsx
 import { useParams, useNavigate } from "react-router-dom";
-import { products } from "@/data/products";
+import { useProductsStore } from "@/lib/products-store"; // ← REACTIVE
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/contexts/CartContext";
@@ -7,13 +8,23 @@ import { ShoppingCart, Star, Truck, Shield, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 
+const formatNaira = (amount: number): string => {
+  return `₦${amount.toLocaleString("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
+
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addItem } = useCart();
   const [quantity, setQuantity] = useState(1);
 
-  const product = products.find((p) => p.id === id);
+  // REACTIVELY get product by ID
+  const product = useProductsStore((state) =>
+    state.products.find((p) => p.id === id)
+  );
 
   if (!product) {
     return (
@@ -39,17 +50,12 @@ const ProductDetail = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Button
-          variant="ghost"
-          onClick={() => navigate(-1)}
-          className="mb-6"
-        >
+        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
 
         <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
-          {/* Image Section */}
           <div className="space-y-4">
             <div className="relative aspect-square rounded-lg overflow-hidden bg-muted">
               <img
@@ -63,25 +69,8 @@ const ProductDetail = () => {
                 </Badge>
               )}
             </div>
-            {product.images.length > 1 && (
-              <div className="grid grid-cols-4 gap-4">
-                {product.images.map((img, idx) => (
-                  <div
-                    key={idx}
-                    className="aspect-square rounded-lg overflow-hidden bg-muted border-2 border-border hover:border-accent cursor-pointer transition-colors"
-                  >
-                    <img
-                      src={img}
-                      alt={`${product.name} view ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* Product Info */}
           <div className="space-y-6">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
@@ -91,27 +80,26 @@ const ProductDetail = () => {
                 <div className="flex items-center gap-1">
                   <Star className="h-5 w-5 fill-accent text-accent" />
                   <span className="font-semibold">{product.rating}</span>
-                  <span className="text-muted-foreground">
-                    ({product.reviews} reviews)
-                  </span>
+                  <span className="text-muted-foreground">({product.reviews} reviews)</span>
                 </div>
-                {product.stock < 10 && (
+                {product.stock < 10 && product.stock > 0 && (
                   <Badge variant="secondary">Only {product.stock} left</Badge>
                 )}
+                {product.stock === 0 && <Badge variant="destructive">Out of Stock</Badge>}
               </div>
             </div>
 
             <div className="flex items-baseline gap-3">
               <span className="text-4xl font-bold text-price">
-                ${displayPrice.toFixed(2)}
+                {formatNaira(displayPrice)}
               </span>
               {hasDiscount && (
                 <>
                   <span className="text-2xl text-muted-foreground line-through">
-                    ${product.price.toFixed(2)}
+                    {formatNaira(product.price)}
                   </span>
-                  <Badge className="bg-sale">
-                    Save ${(product.price - displayPrice).toFixed(2)}
+                  <Badge className="bg-sale text-lg">
+                    Save {formatNaira(product.price - displayPrice)}
                   </Badge>
                 </>
               )}
@@ -119,7 +107,6 @@ const ProductDetail = () => {
 
             <p className="text-foreground leading-relaxed">{product.description}</p>
 
-            {/* Quantity Selector */}
             <div className="flex items-center gap-4">
               <label className="font-semibold text-foreground">Quantity:</label>
               <div className="flex items-center border border-border rounded-md">
@@ -131,12 +118,12 @@ const ProductDetail = () => {
                 >
                   -
                 </Button>
-                <span className="px-6 py-2 font-semibold">{quantity}</span>
+                <span className="px-6 py-2 font-semibold min-w-16 text-center">{quantity}</span>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                  disabled={quantity >= product.stock}
+                  disabled={quantity >= product.stock || product.stock === 0}
                 >
                   +
                 </Button>
@@ -145,7 +132,7 @@ const ProductDetail = () => {
 
             <Button
               size="lg"
-              className="w-full text-lg"
+              className="w-full text-lg font-semibold"
               onClick={handleAddToCart}
               disabled={product.stock === 0}
             >
@@ -153,11 +140,10 @@ const ProductDetail = () => {
               {product.stock === 0 ? "Out of Stock" : "Add to Cart"}
             </Button>
 
-            {/* Features */}
             <div className="border-t border-border pt-6 space-y-4">
               <div className="flex items-center gap-3">
                 <Truck className="h-5 w-5 text-accent" />
-                <span className="text-foreground">Free shipping on orders over $50</span>
+                <span className="text-foreground">Free shipping on orders over ₦50,000</span>
               </div>
               <div className="flex items-center gap-3">
                 <Shield className="h-5 w-5 text-accent" />

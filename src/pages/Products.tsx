@@ -1,8 +1,8 @@
 // src/pages/Products.tsx
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import ProductCard from "@/components/ProductCard";
-import { products, categories } from "@/data/products";
+import { useProductsStore } from "@/lib/products-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,35 +11,41 @@ import { Slider } from "@/components/ui/slider";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { SlidersHorizontal, Search as SearchIcon } from "lucide-react";
 
+const formatNaira = (amount: number): string => {
+  return `₦${amount.toLocaleString("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
+
+// Fixed: Match actual category names from your store
+const categories = [
+  { id: "all", name: "All Products" },
+  { id: "Electronics", name: "Electronics" },
+  { id: "Fashion", name: "Fashion" },
+  { id: "Home & Living", name: "Home & Living" },
+  { id: "Sports", name: "Sports" },
+  { id: "Books", name: "Books" },
+  { id: "Beauty", name: "Beauty" },
+];
+
 const Products = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-
-  // URL params
   const urlQuery = searchParams.get("q") || "";
-  const categoryFilter = searchParams.get("category");
 
-  // Local states
   const [searchInput, setSearchInput] = useState(urlQuery);
-  const [selectedCategory, setSelectedCategory] = useState(categoryFilter || "all");
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [sortBy, setSortBy] = useState("featured");
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000000]);
 
-  // Sync search input with URL on mount or when URL changes
-  useEffect(() => {
-    setSearchInput(urlQuery);
-  }, [urlQuery]);
+  // REACTIVE: Always up to date
+  const products = useProductsStore((state) => state.products);
 
-  // Sync category filter with URL
-  useEffect(() => {
-    setSelectedCategory(categoryFilter || "all");
-  }, [categoryFilter]);
-
-  // Main filtering + sorting logic
   const filteredAndSortedProducts = useMemo(() => {
     let filtered = [...products];
 
-    // 1. Search query filter
+    // Search
     if (urlQuery.trim()) {
       const query = urlQuery.toLowerCase();
       filtered = filtered.filter(
@@ -49,44 +55,37 @@ const Products = () => {
       );
     }
 
-    // 2. Category filter
+    // Category filter - NOW WORKS!
     if (selectedCategory !== "all") {
       filtered = filtered.filter((p) => p.category === selectedCategory);
     }
 
-    // 3. Price filter
+    // Price range
     filtered = filtered.filter((p) => {
       const price = p.salePrice || p.price;
       return price >= priceRange[0] && price <= priceRange[1];
     });
 
-    // 4. Sorting
+    // Sorting
+    const sorted = [...filtered];
     switch (sortBy) {
       case "price-low":
-        filtered.sort((a, b) => (a.salePrice || a.price) - (b.salePrice || b.price));
+        sorted.sort((a, b) => (a.salePrice || a.price) - (b.salePrice || b.price));
         break;
       case "price-high":
-        filtered.sort((a, b) => (b.salePrice || b.price) - (a.salePrice || a.price));
+        sorted.sort((a, b) => (b.salePrice || b.price) - (a.salePrice || a.price));
         break;
       case "rating":
-        filtered.sort((a, b) => b.rating - a.rating);
-        break;
-      case "newest":
-        // Assuming original array is newest first
+        sorted.sort((a, b) => b.rating - a.rating);
         break;
       default:
         // Featured first
-        filtered.sort((a, b) => {
-          if (a.featured && !b.featured) return -1;
-          if (!a.featured && b.featured) return 1;
-          return 0;
-        });
+        sorted.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
     }
 
-    return filtered;
-  }, [urlQuery, selectedCategory, sortBy, priceRange]);
+    return sorted;
+  }, [products, urlQuery, selectedCategory, sortBy, priceRange]);
 
-  // Handle live search (updates URL instantly)
   const handleSearchChange = (value: string) => {
     setSearchInput(value);
     const newParams = new URLSearchParams(searchParams);
@@ -100,16 +99,9 @@ const Products = () => {
 
   const FilterContent = () => (
     <div className="space-y-8">
-      {/* Category Filter */}
       <div>
-        <h3 className="font-semibold text-foreground mb-4">Category</h3>
+        <h3 className="font-semibold mb-4">Category</h3>
         <RadioGroup value={selectedCategory} onValueChange={setSelectedCategory}>
-          <div className="flex items-center space-x-2 mb-3">
-            <RadioGroupItem value="all" id="all" />
-            <Label htmlFor="all" className="cursor-pointer font-normal">
-              All Products
-            </Label>
-          </div>
           {categories.map((cat) => (
             <div key={cat.id} className="flex items-center space-x-2 mb-3">
               <RadioGroupItem value={cat.id} id={cat.id} />
@@ -121,31 +113,27 @@ const Products = () => {
         </RadioGroup>
       </div>
 
-      {/* Price Range */}
       <div>
-        <h3 className="font-semibold text-foreground mb-4">
-          Price Range: ${priceRange[0]} - ${priceRange[1]}
-        </h3>
+        <h3 className="font-semibold mb-4">Price Range</h3>
+        <div className="mb-4 text-sm text-muted-foreground">
+          {formatNaira(priceRange[0])} – {formatNaira(priceRange[1])}
+        </div>
         <Slider
           value={priceRange}
-          onValueChange={(value) => setPriceRange(value as [number, number])}
-          min={0}
-          max={500}
-          step={10}
-          className="w-full"
+          onValueChange={(v) => setPriceRange(v as [number, number])}
+          max={1000000}
+          step={5000}
         />
       </div>
 
-      {/* Sort By */}
       <div>
-        <h3 className="font-semibold text-foreground mb-4">Sort By</h3>
+        <h3 className="font-semibold mb-4">Sort By</h3>
         <RadioGroup value={sortBy} onValueChange={setSortBy}>
           {[
             { value: "featured", label: "Featured" },
             { value: "price-low", label: "Price: Low to High" },
             { value: "price-high", label: "Price: High to Low" },
             { value: "rating", label: "Highest Rated" },
-            { value: "newest", label: "Newest" },
           ].map((item) => (
             <div key={item.value} className="flex items-center space-x-2 mb-3">
               <RadioGroupItem value={item.value} id={item.value} />
@@ -161,77 +149,74 @@ const Products = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header + Search Bar */}
+      <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="mb-10">
-          <h1 className="text-4xl font-bold text-foreground mb-3">
-            {urlQuery ? `Search Results for "${urlQuery}"` : "All Products"}
+          <h1 className="text-4xl font-bold mb-3">
+            {urlQuery ? `Results for "${urlQuery}"` : "All Products"}
           </h1>
           <p className="text-muted-foreground mb-6">
-            {filteredAndSortedProducts.length} products found
+            {filteredAndSortedProducts.length} product{filteredAndSortedProducts.length !== 1 ? "s" : ""} available
           </p>
 
-          {/* Search Input on Page */}
-          <div className="relative max-w-xl">
-            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+          <div className="relative max-w-md">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
-              type="text"
               placeholder="Search products..."
               value={searchInput}
               onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-10 h-12 text-base"
+              className="pl-10"
             />
           </div>
         </div>
 
-        <div className="flex items-center justify-between mb-8">
-          {/* Mobile Filters Button */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" className="lg:hidden">
-                <SlidersHorizontal className="h-4 w-4 mr-2" />
-                Filters & Sort
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-80">
-              <SheetHeader>
-                <SheetTitle>Filters & Sorting</SheetTitle>
-              </SheetHeader>
-              <div className="mt-8">
-                <FilterContent />
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
-
-        <div className="flex gap-10">
-          {/* Desktop Sidebar Filters */}
-          <aside className="hidden lg:block w-72 flex-shrink-0">
-            <div className="sticky top-24 bg-card p-7 rounded-xl border border-border shadow-sm">
-              <h2 className="text-2xl font-bold text-foreground mb-8">Filters</h2>
+        <div className="flex gap-8">
+          {/* Desktop Sidebar */}
+          <aside className="hidden lg:block w-64 flex-shrink-0">
+            <div className="sticky top-24 bg-card p-6 rounded-lg border">
+              <h2 className="text-xl font-bold mb-6">Filters</h2>
               <FilterContent />
             </div>
           </aside>
 
-          {/* Product Grid */}
+          {/* Main Content */}
           <div className="flex-1">
+            <div className="flex justify-between items-center mb-6">
+              <div className="text-sm text-muted-foreground">
+                Showing {filteredAndSortedProducts.length} of {products.length} products
+              </div>
+
+              {/* Mobile Filter */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="outline" className="lg:hidden">
+                    <SlidersHorizontal className="h-4 w-4 mr-2" />
+                    Filters
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left">
+                  <SheetHeader>
+                    <SheetTitle>Filters & Sort</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-6">
+                    <FilterContent />
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+
             {filteredAndSortedProducts.length === 0 ? (
               <div className="text-center py-20">
-                <p className="text-xl text-muted-foreground">
-                  No products found matching your criteria.
+                <p className="text-xl text-muted-foreground mb-4">
+                  No products found matching your filters
                 </p>
-                {urlQuery && (
-                  <Button
-                    variant="link"
-                    onClick={() => {
-                      setSearchInput("");
-                      navigate("/products");
-                    }}
-                    className="mt-4"
-                  >
-                    Clear search
-                  </Button>
-                )}
+                <Button onClick={() => {
+                  setSelectedCategory("all");
+                  setPriceRange([0, 1000000]);
+                  setSortBy("featured");
+                  navigate("/products");
+                }}>
+                  Clear All Filters
+                </Button>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

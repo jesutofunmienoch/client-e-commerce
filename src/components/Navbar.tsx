@@ -1,110 +1,109 @@
-// src/components/Navbar.tsx
-import { Link } from "react-router-dom";
-import { ShoppingCart, User, Menu, X } from "lucide-react";
+// src/components/Navbar.tsx – CLEAN & PROFESSIONAL (No gradient!)
+import { Link, NavLink } from "react-router-dom";
+import { ShoppingCart, Menu, X, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
-import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-
-// Logo with Infinite Rotating Gradient Border (only around the image)
-const GradientLogo = () => {
-  return (
-    <div className="relative group">
-      {/* Rotating Gradient Ring */}
-      <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full blur-lg opacity-75 group-hover:opacity-100 transition duration-1000 animate-spin-slow"></div>
-      
-      {/* Actual Logo Image */}
-      <div className="relative p-0.2 bg-white dark:bg-gray-900 rounded-full ring-4 ring-white/50 dark:ring-gray-900/50">
-        <img
-          src="/favicon.png"
-          alt="ShopHub Logo"
-          className="h-7 w-7 rounded-full object-cover"
-        />
-      </div>
-    </div>
-  );
-};
+import {
+  SignedIn,
+  SignedOut,
+  UserButton,
+  useUser,
+  useClerk,
+} from "@clerk/clerk-react";
 
 const Navbar = () => {
   const { itemCount } = useCart();
-  const { isAuthenticated, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isLoaded, user } = useUser();
+  const { openSignIn } = useClerk();
+
+  const isAdmin = user?.publicMetadata?.role === "admin";
+
+  if (!isLoaded) return null;
+
+  const handleLogin = () => {
+    openSignIn({
+      afterSignInUrl: "/admin/redirect",
+      afterSignUpUrl: "/admin/redirect",
+    });
+  };
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-lg border-b border-white/20 dark:border-gray-700/30 shadow-lg">
-      {/* Add the slow spin animation once */}
-      <style>{`
-        @keyframes spin-slow {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
-        }
-        .animate-spin-slow {
-          animation: spin-slow 20s linear infinite;
-        }
-      `}</style>
-
+    <nav className="sticky top-0 z-50 bg-white dark:bg-gray-900 border-b border-border/50 backdrop-blur-xl shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo + ShopHub Name */}
-          <Link to="/" className="flex items-center space-x-3">
-            <GradientLogo />
-            <span className="text-2xl font-bold text-primary">ShopHub</span>
+
+          {/* Logo + Brand */}
+          <Link to="/" className="flex items-center gap-3">
+            {/* Simple, clean logo */}
+            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-md">
+              <span className="text-white font-bold text-xl">I</span>
+            </div>
+            <span className="text-2xl font-bold text-primary tracking-tight">
+              IPD-Emporium
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <Link to="/products" className="text-foreground/90 hover:text-primary transition-colors font-medium">
+            <Link to="/products" className="text-foreground hover:text-primary font-medium transition-colors">
               Products
             </Link>
-            <Link to="/products?category=electronics" className="text-foreground/90 hover:text-primary transition-colors font-medium">
+            <Link to="/products?category=electronics" className="text-foreground hover:text-primary font-medium transition-colors">
               Electronics
             </Link>
-            <Link to="/products?category=fashion" className="text-foreground/90 hover:text-primary transition-colors font-medium">
+            <Link to="/products?category=fashion" className="text-foreground hover:text-primary font-medium transition-colors">
               Fashion
             </Link>
-            <Link to="/products?category=home" className="text-foreground/90 hover:text-primary transition-colors font-medium">
+            <Link to="/products?category=home" className="text-foreground hover:text-primary font-medium transition-colors">
               Home
             </Link>
+
+            {/* Admin Dashboard */}
+            {isAdmin && (
+              <NavLink
+                to="/admin/dashboard"
+                className="flex items-center gap-2 text-foreground hover:text-primary font-medium transition-colors aria-[current=page]:text-primary aria-[current=page]:font-bold"
+              >
+                <LayoutDashboard className="w-5 h-5" />
+                Dashboard
+              </NavLink>
+            )}
           </div>
 
-          {/* Desktop Right Actions */}
-          <div className="hidden md:flex items-center space-x-4">
+          {/* Right Side - Cart & Auth */}
+          <div className="hidden md:flex items-center gap-4">
             <Link to="/cart">
-              <Button variant="ghost" size="icon" className="relative text-foreground/80 hover:text-primary">
+              <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />
                 {itemCount > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary text-primary-foreground">
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 text-xs bg-primary text-primary-foreground flex items-center justify-center rounded-full">
                     {itemCount}
                   </Badge>
                 )}
               </Button>
             </Link>
 
-            {isAuthenticated ? (
-              <Button variant="ghost" size="icon" onClick={logout} className="text-foreground/80 hover:text-primary">
-                <User className="h-5 w-5" />
+            <SignedOut>
+              <Button onClick={handleLogin} variant="default" size="sm">
+                Login
               </Button>
-            ) : (
-              <Link to="/login">
-                <Button variant="default" className="bg-primary/90 hover:bg-primary text-primary-foreground backdrop-blur">
-                  Login
-                </Button>
-              </Link>
-            )}
+            </SignedOut>
+
+            <SignedIn>
+              <UserButton afterSignOutUrl="/" />
+            </SignedIn>
           </div>
 
-          {/* Mobile Icons */}
-          <div className="md:hidden flex items-center space-x-2">
+          {/* Mobile Menu Toggle */}
+          <div className="md:hidden flex items-center gap-3">
             <Link to="/cart">
-              <Button variant="ghost" size="icon" className="relative text-foreground/80">
+              <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />
                 {itemCount > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary text-primary-foreground">
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 text-xs bg-primary text-primary-foreground rounded-full">
                     {itemCount}
                   </Badge>
                 )}
@@ -114,8 +113,7 @@ const Navbar = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="text-foreground/80"
+              onClick={() => setMobileMenuOpen(v => !v)}
             >
               {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </Button>
@@ -125,25 +123,45 @@ const Navbar = () => {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white/70 dark:bg-gray-900/70 backdrop-blur-lg border-t border-white/20 dark:border-gray-700/30">
-          <div className="px-4 pt-3 pb-4 space-y-1">
-            <Link to="/products" className="block px-3 py-2 rounded-md text-foreground/90 hover:bg-white/30 dark:hover:bg-gray-800/50 transition-colors" onClick={() => setMobileMenuOpen(false)}>
+        <div className="md:hidden bg-background border-t border-border">
+          <div className="px-4 py-4 space-y-3">
+            <Link to="/products" className="block py-2 text-foreground font-medium" onClick={() => setMobileMenuOpen(false)}>
               Products
             </Link>
-            <Link to="/products?category=electronics" className="block px-3 py-2 rounded-md text-foreground/90 hover:bg-white/30 dark:hover:bg-gray-800/50 transition-colors" onClick={() => setMobileMenuOpen(false)}>
+            <Link to="/products?category=electronics" className="block py-2 text-foreground" onClick={() => setMobileMenuOpen(false)}>
               Electronics
             </Link>
-            <Link to="/products?category=fashion" className="block px-3 py-2 rounded-md text-foreground/90 hover:bg-white/30 dark:hover:bg-gray-800/50 transition-colors" onClick={() => setMobileMenuOpen(false)}>
+            <Link to="/products?category=fashion" className="block py-2 text-foreground" onClick={() => setMobileMenuOpen(false)}>
               Fashion
             </Link>
-            <Link to="/products?category=home" className="block px-3 py-2 rounded-md text-foreground/90 hover:bg-white/30 dark:hover:bg-gray-800/50 transition-colors" onClick={() => setMobileMenuOpen(false)}>
+            <Link to="/products?category=home" className="block py-2 text-foreground" onClick={() => setMobileMenuOpen(false)}>
               Home
             </Link>
-            {!isAuthenticated && (
-              <Link to="/login" className="block px-3 py-2 rounded-md text-foreground/90 hover:bg-white/30 dark:hover:bg-gray-800/50 transition-colors" onClick={() => setMobileMenuOpen(false)}>
-                Login
+
+            {isAdmin && (
+              <Link
+                to="/admin/dashboard"
+                className="flex items-center gap-2 py-3 text-primary font-semibold border-t pt-4"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <LayoutDashboard className="w-5 h-5" />
+                Admin Dashboard
               </Link>
             )}
+
+            <div className="border-t pt-4">
+              <SignedOut>
+                <Button onClick={handleLogin} className="w-full" size="lg">
+                  Login
+                </Button>
+              </SignedOut>
+              <SignedIn>
+                <div className="flex items-center gap-3 py-2">
+                  <UserButton afterSignOutUrl="/" />
+                  <span className="font-medium">My Account</span>
+                </div>
+              </SignedIn>
+            </div>
           </div>
         </div>
       )}
